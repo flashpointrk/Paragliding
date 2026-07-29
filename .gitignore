@@ -1,0 +1,72 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+.yarn/install-state.gz
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+next-env.d.ts
+
+# production
+/build
+/dist
+
+# misc
+.DS_Store
+*.pem
+Thumbs.db
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# local env files
+.env
+.env*.local
+.env.production
+
+# prisma
+/prisma/migrations/dev.db*
+
+# Uploads live on a persistent volume, not in the repo (see the "uploads-data"
+# volume in docker-compose.yml). Note: a negation (!...) cannot re-include a
+# file once its parent directory is excluded, so the exclusions are written one
+# level at a time and the .gitkeep files survive to create the directories.
+/public/uploads/*
+!/public/uploads/gallery
+/public/uploads/gallery/*
+!/public/uploads/gallery/.gitkeep
+!/public/uploads/media
+/public/uploads/media/*
+!/public/uploads/media/.gitkeep
+
+# typescript
+*.tsbuildinfo
+
+# IDE
+.vscode/*
+!.vscode/extensions.json
+.idea
+
+# docker
+docker-compose.override.yml
+
+# logs
+logs
+*.log
+
+# Screenshots and stray images at the repo root. Anchored to the root so
+# docs/screenshots/ and public/ are unaffected — an earlier version listed
+# individual filenames, and removing them silently un-ignored the files.
+/*.png
+/*.jpg
+/*.jpeg
+/*.webp
+/*.gif

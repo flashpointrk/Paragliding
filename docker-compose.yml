@@ -1,0 +1,125 @@
+name: yamac-parasutu
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: parasutu-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-parauser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-parasutu}
+    # Exposed to the host for local development. Remove this in production,
+    # where only services on the `parasutu-net` network should reach it. Port
+    # 5433 is used when 5432 is already taken on the host.
+    ports:
+      - "${POSTGRES_BIND_ADDRESS:-127.0.0.1}:${POSTGRES_HOST_PORT:-5433}:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-parauser} -d ${POSTGRES_DB:-parasutu}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - parasutu-net
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # `NEXT_PUBLIC_*` values are inlined into the client bundle at build
+      # time; the `environment` block below only feeds the server. Passing them
+      # as build args is what makes the brand and contact details reach the
+      # browser.
+      args:
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:?NEXT_PUBLIC_SITE_URL is required}
+        NEXT_PUBLIC_SITE_NAME: ${NEXT_PUBLIC_SITE_NAME:-Paragliding}
+        NEXT_PUBLIC_SITE_SHORT_NAME: ${NEXT_PUBLIC_SITE_SHORT_NAME:-}
+        NEXT_PUBLIC_SITE_DESCRIPTION: ${NEXT_PUBLIC_SITE_DESCRIPTION:-}
+        NEXT_PUBLIC_SITE_ALT_URL: ${NEXT_PUBLIC_SITE_ALT_URL:-}
+        NEXT_PUBLIC_OPERATOR: ${NEXT_PUBLIC_OPERATOR:-}
+        NEXT_PUBLIC_PHONE: ${NEXT_PUBLIC_PHONE:-}
+        NEXT_PUBLIC_WHATSAPP: ${NEXT_PUBLIC_WHATSAPP:-}
+        NEXT_PUBLIC_EMAIL: ${NEXT_PUBLIC_EMAIL:-}
+        NEXT_PUBLIC_CONTACTS: ${NEXT_PUBLIC_CONTACTS:-}
+        NEXT_PUBLIC_INSTAGRAM: ${NEXT_PUBLIC_INSTAGRAM:-}
+        NEXT_PUBLIC_FACEBOOK: ${NEXT_PUBLIC_FACEBOOK:-}
+        NEXT_PUBLIC_YOUTUBE: ${NEXT_PUBLIC_YOUTUBE:-}
+    image: yamac-parasutu-web:latest
+    container_name: parasutu-web
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-parauser}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@db:5432/${POSTGRES_DB:-parasutu}?schema=public
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?NEXTAUTH_SECRET is required}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:?NEXTAUTH_URL is required}
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:?NEXT_PUBLIC_SITE_URL is required}
+      NEXT_PUBLIC_SITE_NAME: ${NEXT_PUBLIC_SITE_NAME:-Paragliding}
+      NEXT_PUBLIC_SITE_SHORT_NAME: ${NEXT_PUBLIC_SITE_SHORT_NAME:-}
+      NEXT_PUBLIC_SITE_DESCRIPTION: ${NEXT_PUBLIC_SITE_DESCRIPTION:-}
+      NEXT_PUBLIC_SITE_ALT_URL: ${NEXT_PUBLIC_SITE_ALT_URL:-}
+      NEXT_PUBLIC_OPERATOR: ${NEXT_PUBLIC_OPERATOR:-}
+      NEXT_PUBLIC_WHATSAPP: ${NEXT_PUBLIC_WHATSAPP:-}
+      NEXT_PUBLIC_PHONE: ${NEXT_PUBLIC_PHONE:-}
+      NEXT_PUBLIC_EMAIL: ${NEXT_PUBLIC_EMAIL:-}
+      NEXT_PUBLIC_CONTACTS: ${NEXT_PUBLIC_CONTACTS:-}
+      NEXT_PUBLIC_INSTAGRAM: ${NEXT_PUBLIC_INSTAGRAM:-}
+      NEXT_PUBLIC_FACEBOOK: ${NEXT_PUBLIC_FACEBOOK:-}
+      NEXT_PUBLIC_YOUTUBE: ${NEXT_PUBLIC_YOUTUBE:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@yamacparasutu.local}
+      ADMIN_NAME: ${ADMIN_NAME:-Site Administrator}
+      SEED_SAMPLE_DATA: ${SEED_SAMPLE_DATA:-false}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      NODE_ENV: production
+    ports:
+      # This port is exposed only to the host reverse proxy. On a live server
+      # WEB_HOST_PORT picks a port isolated from the other applications.
+      - "${WEB_BIND_ADDRESS:-127.0.0.1}:${WEB_HOST_PORT:-3000}:3000"
+    volumes:
+      # Gallery uploads must live on a persistent volume rather than inside
+      # the image, otherwise every deploy (a new image) wipes them.
+      - uploads-data:/app/public/uploads
+    networks:
+      - parasutu-net
+
+  caddy:
+    image: caddy:2
+    container_name: parasutu-caddy
+    restart: unless-stopped
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:?SITE_DOMAIN is required}
+    depends_on:
+      - web
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - parasutu-net
+
+volumes:
+  db-data:
+    name: parasutu-db-data
+  # Gallery uploads (public/uploads) — a persistent volume, not part of the image.
+  uploads-data:
+    name: parasutu-uploads
+  caddy-data:
+    name: parasutu-caddy-data
+  caddy-config:
+    name: parasutu-caddy-config
+
+networks:
+  parasutu-net:
+    name: parasutu-net
+    driver: bridge

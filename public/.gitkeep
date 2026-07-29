@@ -1,0 +1,3 @@
+# Static assets live here. The brand mark and favicons are not among them:
+# the mark is drawn by src/components/site/BrandMark.tsx and the icons come from
+# src/app/icon.png and src/app/apple-icon.png.
